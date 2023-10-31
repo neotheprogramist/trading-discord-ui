@@ -46,17 +46,18 @@ class DatabaseController:
     def __init__(self) -> None:
         self.con = sqlite3.connect("database.db")
         self.cur = self.con.cursor()
-        self.create_tables()
+        self._create_tables()
 
-    def create_tables(self) -> None:
+    def _create_tables(self) -> None:
         self.cur.executescript(
             """
                 CREATE TABLE IF NOT EXISTS "strategies" (
                     "id" TEXT PRIMARY KEY NOT NULL, -- assuming you'll use UUID strings
                     "created_at" TIMESTAMP NOT NULL, -- you'll have to set this in your application
+                    "discord_id" INTEGER NOT NULL,
                     "op_id" TEXT NOT NULL,
                     "currency_ticker" TEXT NOT NULL,
-                    "op_initial_contribution" INTEGER,
+                    "op_initial_contribution" INTEGER NOT NULL,
                     "status" TEXT NOT NULL -- changed from ENUM to TEXT
                 );
 
@@ -65,7 +66,7 @@ class DatabaseController:
                     "created_at" TIMESTAMP NOT NULL, -- you'll have to set this in your application
                     "strategy_id" TEXT NOT NULL,
                     "user_id" TEXT NOT NULL,
-                    "value" INTEGER,
+                    "value" INTEGER NOT NULL,
                     FOREIGN KEY ("strategy_id") REFERENCES "strategies" ("id")
                 );
 
@@ -73,15 +74,88 @@ class DatabaseController:
                     "id" TEXT PRIMARY KEY NOT NULL, -- assuming you'll use UUID strings
                     "created_at" TIMESTAMP NOT NULL, -- you'll have to set this in your application
                     "strategy_id" TEXT NOT NULL,
-                    "sell_volume" INTEGER,
-                    "buy_volume" INTEGER,
+                    "sell_volume" INTEGER NOT NULL,
+                    "buy_volume" INTEGER NOT NULL,
                     FOREIGN KEY ("strategy_id") REFERENCES "strategies" ("id")
                 );
             """
         )
 
-    def get_all_strategies(self) -> list[Strategy]:
-        pass
+    def add_strategy(self, strategy: Strategy) -> None:
+        self.cur.execute(
+            """
+            INSERT INTO "strategies" (id, created_at, discord_id, op_id, currency_ticker, op_initial_contribution, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                str(strategy.id),
+                strategy.created_at,
+                strategy.op_id,
+                strategy.currency_ticker,
+                strategy.op_initial_contribution,
+                strategy.status.name,
+            ),
+        )
+        self.con.commit()
 
-    def get_strategy_by_id(self, id) -> Strategy:
-        pass
+    def add_contribution(self, contribution: Contribution) -> None:
+        self.cur.execute(
+            """
+            INSERT INTO "contributions" (id, created_at, strategy_id, user_id, value)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                str(contribution.id),
+                contribution.created_at,
+                str(contribution.strategy_id),
+                str(contribution.user_id),
+                contribution.value,
+            ),
+        )
+        self.con.commit()
+
+    def add_trade(self, trade: Trade) -> None:
+        self.cur.execute(
+            """
+            INSERT INTO "trades" (id, created_at, strategy_id, sell_volume, buy_volume)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                str(trade.id),
+                trade.created_at,
+                str(trade.strategy_id),
+                trade.sell_volume,
+                trade.buy_volume,
+            ),
+        )
+        self.con.commit()
+
+    def get_all_strategies(self) -> list[Strategy]:
+        self.cur.execute("SELECT * FROM strategies")
+        strategies = []
+        for row in self.cur.fetchall():
+            strategies.append(
+                Strategy(
+                    id=UUID(row[0]),
+                    created_at=row[1],
+                    op_id=UUID(row[3]),
+                    currency_ticker=row[4],
+                    op_initial_contribution=row[5],
+                    status=StrategyStatus[row[6]],
+                )
+            )
+        return strategies
+
+    def get_strategy_by_discord_id(self, discord_id) -> Strategy:
+        self.cur.execute("SELECT * FROM strategies WHERE discord_id=?", (discord_id,))
+        row = self.cur.fetchone()
+        if row:
+            return Strategy(
+                id=UUID(row[0]),
+                created_at=row[1],
+                op_id=UUID(row[3]),
+                currency_ticker=row[4],
+                op_initial_contribution=row[5],
+                status=StrategyStatus[row[6]],
+            )
+        return None

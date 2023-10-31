@@ -1,23 +1,65 @@
-name: Pylint
+name: Python Static Analysis and Formatting
 
-on: [push]
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.8", "3.9", "3.10"]
+        python-version: ["3.11", "3.12"]
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
-      with:
-        python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install pylint
-    - name: Analysing the code with pylint
-      run: |
-        pylint $(git ls-files '*.py')
+      - uses: actions/checkout@v3
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install black isort flake8 mypy bandit pylint pyright
+
+      # Formatting with Black
+      - name: Check code formatting with Black
+        run: |
+          black --check .
+
+      # Sorting imports with isort
+      - name: Check import sorting with isort
+        run: |
+          isort . --check --diff
+
+      # Linting with Flake8
+      - name: Linting with Flake8
+        run: |
+          flake8 .
+
+      # Type checking with Mypy
+      - name: Type checking with Mypy
+        run: |
+          mypy .
+
+      # Security check with Bandit
+      - name: Security checks with Bandit
+        run: |
+          bandit -r .
+
+      # Type checking with Pyright (this requires Node.js to be installed)
+      - name: Setup Node.js for Pyright
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - name: Type checking with Pyright
+        run: |
+          npx pyright
+
+      # Linting with Pylint
+      - name: Analysing the code with pylint
+        run: |
+          pylint $(git ls-files '*.py')
