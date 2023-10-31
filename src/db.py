@@ -18,7 +18,8 @@ class StrategyStatus(Enum):
 class Strategy:
     id: UUID
     created_at: datetime
-    op_id: UUID
+    strategy_discord_id: int
+    op_discord_id: int
     currency_ticker: str
     op_initial_contribution: int
     status: StrategyStatus
@@ -54,8 +55,8 @@ class DatabaseController:
                 CREATE TABLE IF NOT EXISTS "strategies" (
                     "id" TEXT PRIMARY KEY NOT NULL, -- assuming you'll use UUID strings
                     "created_at" TIMESTAMP NOT NULL, -- you'll have to set this in your application
-                    "discord_id" INTEGER NOT NULL,
-                    "op_id" TEXT NOT NULL,
+                    "strategy_discord_id" INTEGER NOT NULL,
+                    "op_discord_id" TEXT NOT NULL,
                     "currency_ticker" TEXT NOT NULL,
                     "op_initial_contribution" INTEGER NOT NULL,
                     "status" TEXT NOT NULL -- changed from ENUM to TEXT
@@ -84,13 +85,14 @@ class DatabaseController:
     def add_strategy(self, strategy: Strategy) -> None:
         self.cur.execute(
             """
-            INSERT INTO "strategies" (id, created_at, discord_id, op_id, currency_ticker, op_initial_contribution, status)
+            INSERT INTO "strategies" (id, created_at, strategy_discord_id, op_discord_id, currency_ticker, op_initial_contribution, status)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 str(strategy.id),
                 strategy.created_at,
-                strategy.op_id,
+                strategy.strategy_discord_id,
+                strategy.op_discord_id,
                 strategy.currency_ticker,
                 strategy.op_initial_contribution,
                 strategy.status.name,
@@ -138,7 +140,8 @@ class DatabaseController:
                 Strategy(
                     id=UUID(row[0]),
                     created_at=row[1],
-                    op_id=UUID(row[3]),
+                    strategy_discord_id=row[2],
+                    op_discord_id=row[3],
                     currency_ticker=row[4],
                     op_initial_contribution=row[5],
                     status=StrategyStatus[row[6]],
@@ -146,14 +149,17 @@ class DatabaseController:
             )
         return strategies
 
-    def get_strategy_by_discord_id(self, discord_id) -> Strategy:
-        self.cur.execute("SELECT * FROM strategies WHERE discord_id=?", (discord_id,))
+    def get_strategy_by_discord_id(self, discord_id: int) -> Strategy:
+        self.cur.execute(
+            "SELECT * FROM strategies WHERE strategy_discord_id=?", (discord_id,)
+        )
         row = self.cur.fetchone()
         if row:
             return Strategy(
                 id=UUID(row[0]),
                 created_at=row[1],
-                op_id=UUID(row[3]),
+                strategy_discord_id=row[2],
+                op_discord_id=row[3],
                 currency_ticker=row[4],
                 op_initial_contribution=row[5],
                 status=StrategyStatus[row[6]],
